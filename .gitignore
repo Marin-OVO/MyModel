@@ -2,7 +2,7 @@
 .idea/
 
 # Common Python ignores
-__pycache__/
+/utils/__pycache__/
 *.py[cod]
 *.pth
 .env
