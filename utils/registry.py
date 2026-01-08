@@ -13,7 +13,6 @@ class Registry:
             module_key (str, optional): module key, used for updating its __all__ variable.
                 Defaults to None.
     """
-
     def __init__(self, name: str, module_key: Optional[str] = None) -> None:
         self.name = name
         self.module_key = module_key

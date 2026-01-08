@@ -35,20 +35,22 @@ def train_one_epoch(
     batch_start = time.time()
 
     model.train()
+
+    criterion = nn.CrossEntropyLoss()
     for step, (images, targets) in enumerate(train_dataloader):
 
         images = images.to(device)
 
-        if isinstance(targets, (list, tuple)):
-            targets = [tar.to(device) for tar in targets]
-        else:
-            targets = targets.to(device)
+        outputs = model(images)
 
-        loss_dict = model(images, targets)
-        first_order_loss.update(loss_dict['first_order_loss'].item())
-        second_order_loss.update(loss_dict['second_order_loss'].item())
+        gt_mask = targets.to(device).long()
+        if gt_mask.dim() == 4:
+            gt_mask = gt_mask.squeeze(1)
 
-        loss = sum(loss for loss in loss_dict.values())
+        loss = criterion(outputs, gt_mask)
+
+        first_order_loss.update(loss.item())
+        second_order_loss.update(0.0)
         losses.update(loss.item())
 
         optimizer.zero_grad()
@@ -105,7 +107,7 @@ def val_one_epoch(
 
     for step, (images, targets) in enumerate(val_dataloader):
         images = images.cuda()
-        output, _ = model(images)
+        output = model(images)
 
         gt_coords = [p[::-1] for p in targets['points'].squeeze(0).tolist()]
         gt_labels = targets['labels'].squeeze(0).tolist()
