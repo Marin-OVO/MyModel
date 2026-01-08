@@ -2,8 +2,8 @@ import time
 
 from utils.lmds import LMDS
 from typing import Optional, Union
-from logger import *
-from averager import *
+from .logger import *
+from .averager import *
 
 import torch
 import torch.nn as nn
@@ -19,7 +19,7 @@ def train_one_epoch(
         device: torch.device,
         logger: logging.Logger,
         print_freq: int,
-        cfg: dict
+        args
         ) -> float:
     # metric indicators
     first_order_loss = AverageMeter(20)
@@ -61,7 +61,7 @@ def train_one_epoch(
                 "First:{first_order_loss.val:.3f}({first_order_loss.avg:.3f})  "
                 "Second:{second_order_loss.val:.3f}({second_order_loss.avg:.3f})  "
                 "Loss:{losses.val:.3f}({losses.avg:.3f})  ".format(
-                    cfg["training_settings"]["epochs"], epoch, step,
+                    args.epoch, epoch, step,
                     first_order_loss=first_order_loss,
                     second_order_loss=second_order_loss,
                     losses=losses,
@@ -79,7 +79,7 @@ def train_one_epoch(
         "Second:{second_order_loss.val:.3f}({second_order_loss.avg:.3f})  "
         "Loss:{losses.val:.3f}({losses.avg:.3f})  "
         "Time:{batch_times.avg:.2f}  ".format(
-            cfg["training_settings"]["epochs"],
+            args.epoch,
             first_order_loss=first_order_loss,
             second_order_loss=second_order_loss,
             losses=losses,
@@ -95,7 +95,7 @@ def val_one_epoch(
         val_dataloader: torch.utils.data.DataLoader,
         epoch: int,
         metrics: object,
-        cfg: dict
+        args
         ) -> Union[float, torch.Tensor]:
     metrics.flush()
 
@@ -115,8 +115,8 @@ def val_one_epoch(
             labels=gt_labels
         )
 
-        lmds = LMDS(kernel_size=cfg["val_settings"]["lmds_kwargs"]["kernel_size"],
-                    adapt_ts=cfg["val_settings"]["lmds_kwargs"]["adapt_ts"])
+        lmds = LMDS(kernel_size=args.kernel_size,
+                    adapt_ts=args.adapt_ts)
 
         counts, locs, labels, scores = lmds(output)
 

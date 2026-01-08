@@ -44,7 +44,8 @@ class CrowdDataset(Dataset):
         assert isinstance(end_transforms, (list, type(None))), \
             f'end-transformations must be a list, got {type(end_transforms)}'
 
-        self.data_root = os.path.abspath(os.path.join(os.path.dirname(__file__), data_root))
+
+        self.data_root = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), data_root))
         self.train_list = train_list
         self.val_list = val_list
         self.albu_transforms = albu_transforms

@@ -1,15 +1,18 @@
 import argparse
+import os
+import pandas as pd
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import DataLoader
+from colorama import Fore, Style
 
 from model import UNet
 from datasets import CrowdDataset
-from utils import *
-from utils.main import *
-from utils.logger import *
+from utils.metrics import PointsMetrics
+from utils.main import train_one_epoch, val_one_epoch
+from utils.logger import setup_default_logging
+import albumentations as A
+from datasets.transforms import Normalize, PointsToMask
 
 
 def args_parser():
@@ -36,6 +39,11 @@ def args_parser():
     parser.add_argument('--radius', default=2, type=int)
     parser.add_argument('--lmds_kernel_size', default=3, type=int)
     parser.add_argument('--lmds_adapt_ts', default=0.5, type=float)
+    parser.add_argument('--checkpoint', default='best', type=str,
+                        choices=['best', 'all', 'latest'])
+    parser.add_argument('--select_mode', default='max', type=str,
+                        choices=['min', 'max'])
+    parser.add_argument('--validate_on', default='mAP', type=str)
 
     args = parser.parse_args()
 
@@ -53,13 +61,19 @@ def main(args):
     os.makedirs(args.output_dir, exist_ok=True)
     logger, timestr = setup_default_logging('training', args.output_dir)
 
+    work_dir = os.path.join(args.output_dir, f'run_{timestr}')
+    os.makedirs(work_dir, exist_ok=True)
+
+    # save csv
+    csv_path = os.path.join(work_dir, 'training_log.csv')
+
     logger.info('=' * 60)
     logger.info('Training Configuration:')
     for arg, value in vars(args).items():
         logger.info(f'{arg}: {value}')
     logger.info('=' * 60)
 
-    model = UNet(num_class=args.num_classes, bilinear=args.bilinear)
+    model = UNet(num_ch=3, num_class=args.num_classes, bilinear=args.bilinear)
     model.to(device)
     logger.info(f'Model created and moved to {device}')
 
@@ -74,17 +88,27 @@ def main(args):
         eta_min=1e-6
     )
 
+    train_albu_transforms = [A.HorizontalFlip(p=0.5), A.VerticalFlip(p=0.5)]
+    train_end_transforms = [Normalize(), PointsToMask(radius=args.radius, num_classes=args.num_classes, squeeze=True)]
+
+    val_albu_transforms = []
+    val_end_transforms = [Normalize(), PointsToMask(radius=args.radius, num_classes=args.num_classes, squeeze=True)]
+
     train_dataset = CrowdDataset(
         data_root=args.data_root,
         train=True,
         train_list="crowd_train.list",
         val_list="crowd_val.list",
+        albu_transforms=train_albu_transforms,
+        end_transforms=train_end_transforms
     )
     val_dataset = CrowdDataset(
         data_root=args.data_root,
         train=False,
         train_list="crowd_train.list",
         val_list="crowd_val.list",
+        albu_transforms=val_albu_transforms,
+        end_transforms=val_end_transforms
     )
     logger.info(f'Train dataset size: {len(train_dataset)}')
     logger.info(f'Val dataset size: {len(val_dataset)}')
@@ -105,35 +129,119 @@ def main(args):
 
     metrics = PointsMetrics(radius=2, num_classes=args.num_classes)
 
-    for ep in range(args.epoch):
-        print(f'\nEpoch {ep + 1}/{args.epoch}')
-        print('-' * 50)
+    checkpoints = args.checkpoint
+    select = args.select_mode
+    validate_on = args.validate_on
+    print_freq = args.print_freq
 
-        train_loss = train_one_epoch(model, train_dataloader, optimizer, device, train_criterion)
-        val_loss, val_miou, val_mf1 = val_one_epoch(
-            model, val_dataloader, device, val_criterion, args.out_ch
+    assert checkpoints in ['best', 'all', 'latest']
+    assert select in ['min', 'max']
+
+    last_epoch = 0
+    best_epoch = -1
+
+    if select == 'min':
+        best_val = float('inf')
+    elif select == 'max':
+        best_val = 0
+
+    # Training loop
+    logger.info('Start Training:')
+
+    for epoch in range(last_epoch, args.epoch):
+        logger.info('=' * 60)
+        logger.info(f'Epoch {epoch + 1}/{args.epoch}')
+        logger.info('=' * 60)
+
+        # Train
+        loss = train_one_epoch(
+            model=model,
+            train_dataloader=train_dataloader,
+            optimizer=optimizer,
+            epoch=epoch + 1,
+            device=device,
+            logger=logger,
+            print_freq=print_freq,
+            args=args
         )
 
-        print(
-            f'Train Loss: {train_loss:.4f} | '
-            f'Val Loss: {val_loss:.4f} | '
-            f'mIoU: {val_miou:.4f} | '
-            f'mean F1: {val_mf1:.4f}'
+        tmp_results = val_one_epoch(
+            model=model,
+            val_dataloader=val_dataloader,
+            epoch=epoch + 1,
+            device=device,
+            metrics=metrics,
+            args=args
         )
 
-        if val_miou > best_miou:
-            best_miou = val_miou
-            torch.save({
-                'epoch': ep + 1,
-                'model': args.model,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'val_loss': val_loss,
-                'config': vars(args)
-            }, args.save)
-            print(f'Saved best model (mIoU={val_miou:.4f})')
+        is_best = False
+
+        if select == 'min':
+            if tmp_results[validate_on] < best_val:
+                best_val = tmp_results[validate_on]
+                best_epoch = epoch
+                is_best = True
+
+        elif select == 'max':
+            if tmp_results[validate_on] > best_val:
+                best_val = tmp_results[validate_on]
+                best_epoch = epoch
+                is_best = True
+
+        # Save checkpoints
+        state = {
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'scheduler_state_dict': lr_scheduler.state_dict(),
+            'loss': loss,
+            'best_val': best_val,
+            'config': vars(args)
+        }
+
+        if checkpoints == 'best':
+            if is_best:
+                outpath = os.path.join(work_dir, 'best_model.pth')
+                torch.save(state, outpath)
+                logger.info(f'✓ Saved best model to {outpath}')
+        elif checkpoints == 'latest':
+            outpath = os.path.join(work_dir, 'latest_model.pth')
+            torch.save(state, outpath)
+        elif checkpoints == 'all':
+            if is_best:
+                outpath = os.path.join(work_dir, 'best_model.pth')
+                torch.save(state, outpath)
+            outpath = os.path.join(work_dir, 'latest_model.pth')
+            torch.save(state, outpath)
+
+        # Add best info to results
+        tmp_results['best_val'] = best_val
+        tmp_results['best_epoch'] = best_epoch
+        tmp_results['train_loss'] = loss
+
+        # Log to CSV
+        data_frame = pd.DataFrame(data=tmp_results, index=[epoch])
+        if epoch == 0:
+            data_frame.to_csv(csv_path, mode='w', header=True, index_label='epoch')
+        else:
+            data_frame.to_csv(csv_path, mode='a', header=False, index_label='epoch')
+
+        # Log validation results with color
+        logger.info(
+            f"{Fore.CYAN}<<Test>>{Style.RESET_ALL} - "
+            f"Epoch: {Fore.CYAN}{epoch}{Style.RESET_ALL}.  "
+            f"{Fore.BLUE}{validate_on}{Style.RESET_ALL}: {Fore.GREEN}{tmp_results[validate_on]:.4f}{Style.RESET_ALL}.  "
+            f"{Fore.BLUE}Best-Val:{Style.RESET_ALL}{Fore.RED}{best_val:.4f}{Style.RESET_ALL}  "
+            f"{Fore.BLUE}Best-Epoch:{Style.RESET_ALL}{Fore.RED}{best_epoch}{Style.RESET_ALL}"
+        )
 
         lr_scheduler.step()
+
+    logger.info('=' * 60)
+    logger.info('Training Complete!')
+    logger.info(f'Best {validate_on}: {best_val:.4f} at epoch {best_epoch}')
+    logger.info(f'Results saved to: {work_dir}')
+    logger.info('=' * 60)
 
 
 if __name__ == "__main__":

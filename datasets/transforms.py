@@ -13,6 +13,7 @@ TRANSFORMS = Registry(name = 'transforms', module_key = 'datasets.transforms')
 
 __all__ = ['TRANSFORMS', *TRANSFORMS.registry_names]
 
+
 def _point_buffer(x: int, y: int, mask: torch.Tensor, radius: int) -> torch.Tensor:
     x_t, y_t = torch.arange(0, mask.size(1)), torch.arange(0, mask.size(0))
     buffer = (x_t.unsqueeze(0) - x) ** 2 + (y_t.unsqueeze(1) - y) ** 2 < radius ** 2
@@ -56,6 +57,7 @@ class MultiTransformsWrapper:
 
         return img, tuple(outputs)
 
+
 @TRANSFORMS.register()
 class SampleToTensor:
     "Convert image and target to Tensors"
@@ -84,6 +86,7 @@ class SampleToTensor:
 
         return tr_img, tr_target
 
+
 @TRANSFORMS.register()
 class UnNormalize:
     "Reverse normalization"
@@ -104,6 +107,7 @@ class UnNormalize:
 
         return img
 
+
 @TRANSFORMS.register()
 class Normalize:
     "normalization"
@@ -117,12 +121,14 @@ class Normalize:
         self.mean = mean
         self.std = std
 
-    def __call__(self, img: torch.Tensor) -> torch.Tensor:
+    def __call__(self, image: torch.Tensor, target) -> torch.Tensor:
+        if self.mean is not None and self.std is not None:
+            mean = torch.tensor(self.mean, device=image.device).view(-1, 1, 1)
+            std = torch.tensor(self.std, device=image.device).view(-1, 1, 1)
+            image = (image - mean) / std
 
-        for i, m, s in zip(img, self.mean, self.std):
-            i.sub_(m).div_(s)
+        return image, target
 
-        return img
 
 @TRANSFORMS.register()
 class DownSample:
@@ -152,6 +158,7 @@ class DownSample:
         target['points'] = torch.div(target['points'], self.down_ratio, rounding_mode='floor')
 
         return img, target
+
 
 @TRANSFORMS.register()
 class PointsToMask:
