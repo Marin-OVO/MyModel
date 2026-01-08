@@ -1,9 +1,9 @@
 # Log scripy
-
 from datetime import datetime
 import logging
 import os
 import sys
+
 
 def time_str(fmt=None):
     if fmt is None:
@@ -25,4 +25,5 @@ def setup_default_logging(name, save_path, level=logging.INFO,
     console_handler.setLevel(level)
     console_handler.setFormatter(logging.Formatter(format))
     logger.addHandler(console_handler)
+
     return logger, tmp_timestr

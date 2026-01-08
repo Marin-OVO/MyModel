@@ -13,11 +13,11 @@ METRICS = Registry(name='metrics', module_key='utils.metrics')
 
 __all__ = ['METRICS', *METRICS.registry_names]
 
+
 @METRICS.register()
 class Metrics:
-    "This is based on https://github.com/Alexandre-Delplanque/HerdNet/blob/main/animaloc/eval/metrics.py"
-    '''
-    Class to accumulate classification, detection and counting metrics, i.e.:
+    """
+        Class to accumulate classification, detection and counting metrics, i.e.:
 
         - Precision
         - Recall
@@ -29,20 +29,19 @@ class Metrics:
         - Interclass confusion
         - Classification accuracy
 
-    for binary or multiclass model.
+        for binary or multiclass model.
 
-    First, instanciate with a data matching threshold (e.g. IoU, radius),
-    then feed the object with ground truth and predictions. You can retrieve
-    any metric at any time by calling the corresponding attribute.
-    '''
-
+        First, instanciate with a data matching threshold (e.g. IoU, radius),
+        then feed the object with ground truth and predictions. You can retrieve
+        any metric at any time by calling the corresponding attribute.
+    """
     def __init__(self, threshold: float, num_classes: int = 2) -> None:
-        '''
-        Args:
-            threshold (float): data matching threshold
-            num_classes (int, optional): number of classes, background included.
-                Defaults to 2 (binary case).
-        '''
+        """
+            Args:
+                threshold (float): data matching threshold
+                num_classes (int, optional): number of classes, background included.
+                    Defaults to 2 (binary case).
+        """
 
         self.threshold = threshold
         self.num_classes = num_classes
@@ -68,18 +67,18 @@ class Metrics:
         self._confusion_matrix = self.confusion_matrix
 
     def feed(self, gt: dict, preds: dict, est_count: Optional[list] = None) -> None:
-        ''' Feed the object with ground truth and predictions and returns
-        specified metrics optionally.
+        """
+            Feed the object with ground truth and predictions and returns
+            specified metrics optionally.
 
-        Args:
-            gt (dict): ground truth containing a dict with 'loc' and 'labels'
-                keys and list as values.
-            preds (dict): predictions containing a dict with 'loc' and 'labels'
-                keys and list as values. Can contain an optional 'scores' key.
-            est_count (list, optional): list containing estimated count for each
-                class, background excluded. Defaults to None.
-        '''
-
+            Args:
+                gt (dict): ground truth containing a dict with 'loc' and 'labels'
+                    keys and list as values.
+                preds (dict): predictions containing a dict with 'loc' and 'labels'
+                    keys and list as values. Can contain an optional 'scores' key.
+                est_count (list, optional): list containing estimated count for each
+                    class, background excluded. Defaults to None.
+        """
         assert isinstance(est_count, (type(None), list))
         for o in [gt, preds]:
             assert isinstance(o, dict)
@@ -114,15 +113,16 @@ class Metrics:
         self.idx += 1
 
     def matching(self, gt: dict, preds: dict) -> None:
-        ''' Method to match ground truth and predictions.
-        To be overriden by subclasses
+        """
+            Method to match ground truth and predictions.
+            To be overriden by subclasses
 
-        Args:
-            gt (dict): ground truth containing a dict with 'loc' and 'labels'
-                keys and list as values.
-            preds (dict): predictions containing a dict with 'loc' and 'labels'
-                keys and list as values. Can contain an optional 'scores' key.
-        '''
+            Args:
+                gt (dict): ground truth containing a dict with 'loc' and 'labels'
+                    keys and list as values.
+                preds (dict): predictions containing a dict with 'loc' and 'labels'
+                    keys and list as values. Can contain an optional 'scores' key.
+        """
         pass
 
     def copy(self):
@@ -130,7 +130,9 @@ class Metrics:
         return clone
 
     def flush(self) -> None:
-        ''' Flush the object '''
+        """
+            Flush the object
+        """
 
         self.detections = []
         self.idx = 0
@@ -153,11 +155,12 @@ class Metrics:
         self._confusion_matrix = self.confusion_matrix
 
     def aggregate(self) -> None:
-        ''' Aggregate the metrics.
+        """
+            Aggregate the metrics.
 
-        By default, the classes are aggregated into a single class and the metrics are
-        therefore relative to the object vs. background configuration.
-        '''
+            By default, the classes are aggregated into a single class and the metrics are
+            therefore relative to the object vs. background configuration.
+        """
 
         inter = int(self._confusion_matrix.sum()) - sum(self.tp)
 
@@ -172,13 +175,15 @@ class Metrics:
         self._total_count = [sum(self._total_count)]
 
     def precision(self, c: int = 1) -> float:
-        ''' Precision
-        Args:
-            c (int, optional): class id. Defaults to 1.
+        """
+            Precision
 
-        Returns:
-            float
-        '''
+            Args:
+                c (int, optional): class id. Defaults to 1.
+
+            Returns:
+                float
+        """
         c = c - 1
         if self.tp[c] > 0:
             return float(self.tp[c] / (self.tp[c] + self.fp[c]))
@@ -186,13 +191,15 @@ class Metrics:
             return float(0)
 
     def recall(self, c: int = 1) -> float:
-        ''' Recall
-        Args:
-            c (int, optional): class id. Defaults to 1.
+        """
+            Recall
 
-        Returns:
-            float
-        '''
+            Args:
+                c (int, optional): class id. Defaults to 1.
+
+            Returns:
+                float
+        """
 
         c = c - 1
         if self.tp[c] > 0:
@@ -201,14 +208,16 @@ class Metrics:
             return float(0)
 
     def fbeta_score(self, c: int = 1, beta: int = 1) -> float:
-        ''' F-beta score
-        Args:
-            c (int, optional): class id. Defaults to 1.
-            beta (int, optional): beta value. Defaults to 1.
+        """
+            F-beta score
 
-        Returns:
-            float
-        '''
+            Args:
+                c (int, optional): class id. Defaults to 1.
+                beta (int, optional): beta value. Defaults to 1.
+
+            Returns:
+                float
+        """
 
         if self.tp[c-1] > 0:
             return float(
@@ -219,49 +228,56 @@ class Metrics:
             return float(0)
 
     def mae(self, c: int = 1) -> float:
-        ''' Mean Absolute Error
+        """
+        Mean Absolute Error
+
         Args:
             c (int, optional): class id. Defaults to 1.
 
         Returns:
             float
-        '''
+        """
 
         c = c - 1
         return float(self._sum_absolute_error[c] / self._n_calls[c]) \
             if self._n_calls[c] else 0.
 
     def mse(self, c: int = 1) -> float:
-        ''' Mean Squared Error
-        Args:
-            c (int, optional): class id. Defaults to 1.
+        """
+            Mean Squared Error
 
-        Returns:
-            float
-        '''
+            Args:
+                c (int, optional): class id. Defaults to 1.
+
+            Returns:
+                float
+        """
         c = c - 1
         return float(self._sum_squared_error[c] / self._n_calls[c]) \
             if self._n_calls[c] else 0.
 
     def rmse(self, c: int = 1) -> float:
-        ''' Root Mean Squared Error
-        Args:
-            c (int, optional): class id. Defaults to 1.
+        """
+            Root Mean Squared Error
 
-        Returns:
-            float
-        '''
+            Args:
+                c (int, optional): class id. Defaults to 1.
+
+            Returns:
+                float
+        """
         return float(math.sqrt(self.mse(c)))
 
     def ap(self, c: int = 1) -> float:
-        ''' Average Precision
-        Args:
-            c (int, optional): class id. Defaults to 1.
+        """
+            Average Precision
 
-        Returns:
-            float
-        '''
+            Args:
+                c (int, optional): class id. Defaults to 1.
 
+            Returns:
+                float
+        """
         recalls, precisions = self.rec_pre_lists(c)
 
         if len(recalls) == 0 or len(precisions) == 0:
@@ -270,15 +286,16 @@ class Metrics:
             return self._compute_AP(recalls, precisions)
 
     def rec_pre_lists(self, c: int = 1) -> tuple:
-        ''' Recalls and Precisions lists
-        Args:
-            c (int, optional): class id. Defaults to 1.
+        """
+            Recalls and Precisions lists
 
-        Returns:
-            tuple
-                recalls and precisions
-        '''
+            Args:
+                c (int, optional): class id. Defaults to 1.
 
+            Returns:
+                tuple
+                    recalls and precisions
+        """
         c = c - 1
 
         if len(self._ap_tables[c]) == 0:
@@ -298,25 +315,28 @@ class Metrics:
             return recalls.tolist(), precisions.tolist()
 
     def confusion(self, c: int = 1) -> float:
-        ''' Interclass confusion
-        Args:
-            c (int, optional): class id. Defaults to 1.
+        """
+            Interclass confusion
 
-        Returns:
-            float
-                interclass confusion
-        '''
+            Args:
+                c (int, optional): class id. Defaults to 1.
+
+            Returns:
+                float
+                    interclass confusion
+        """
         c = c - 1
         cm_row = self._confusion_matrix[c]
         p = cm_row[c]/sum(cm_row) if sum(cm_row) else 0.
         return 1 - p
 
     def accuracy(self) -> float:
-        ''' Classification accuracy
+        """
+            Classification accuracy
 
-        Returns:
-            float
-        '''
+            Returns:
+                float
+        """
 
         N = self.confusion_matrix.sum()
         tp = self.confusion_matrix.diagonal().sum()
@@ -326,14 +346,16 @@ class Metrics:
             return 0.
 
     def total_count(self, c: int = 1) -> float:
-        ''' Total class count
-        Args:
-            c (int, optional): class id. Defaults to 1.
+        """
+            Total class count
 
-        Returns:
-            float
-                count
-        '''
+            Args:
+                c (int, optional): class id. Defaults to 1.
+
+            Returns:
+                float
+                    count
+        """
         c = c - 1
         return self._total_count[c]
 
@@ -386,12 +408,11 @@ class Metrics:
             self.fn[c-1] += n_gt
 
     def _compute_AP(self, recalls: list, precisions: list) -> float:
-        '''
-        Compute the VOC Average Precision
-        Code from: https://github.com/Cartucho/mAP
-        (adapted from official matlab code VOC2012)
-        '''
-
+        """
+            Compute the VOC Average Precision
+            Code from: https://github.com/Cartucho/mAP
+            (adapted from official matlab code VOC2012)
+        """
         recalls.insert(0, 0.0)
         recalls.append(1.0)
         precisions.insert(0, 0.0)
@@ -414,8 +435,9 @@ class Metrics:
         return ap
 
     def _store_detections(self, preds: dict, est_count: Optional[list] = None) -> None:
-        ''' Store detections internally (1 row = 1 detection) '''
-
+        """
+            Store detections internally (1 row = 1 detection)
+        """
         m = map(dict, zip( * [
             [(k, v) for v in value]
             for k, value in preds.items()
@@ -434,16 +456,17 @@ class Metrics:
 
 @METRICS.register()
 class PointsMetrics(Metrics):
-    ''' Metrics class for points (must be in (x,y) format) '''
-
+    """
+        Metrics class for points (must be in (x,y) format)
+    """
     def __init__(self, radius: float, num_classes: int = 2) -> None:
-        '''
-        Args:
-            radius (float): distance between ground truth and predicted point
-                from which a point is characterizd as true positive
-            num_classes (int, optional): number of classes, background included.
-                Defaults to 2 (binary case).
-        '''
+        """
+            Args:
+                radius (float): distance between ground truth and predicted point
+                    from which a point is characterizd as true positive
+                num_classes (int, optional): number of classes, background included.
+                    Defaults to 2 (binary case).
+        """
         super().__init__(threshold=radius, num_classes=num_classes)
         self.current_tp = []  # 存储当前批次的TP坐标（预测点）
         self.current_fp = []  # 存储当前批次的FP坐标（预测点）

@@ -5,6 +5,7 @@ import numpy
 import torch.nn.functional as F
 from typing import Tuple, List
 
+
 class LMDS:
     def __init__(
         self,
@@ -12,15 +13,15 @@ class LMDS:
         adapt_ts: float = 100.0 / 255.0,
         neg_ts: float = 0.1
         ) -> None:
-        '''
-        Args:
-            kernel_size (tuple, optional): size of the kernel used to select local
-                maxima. Defaults to (3,3) (as in the paper).
-            adapt_ts (float, optional): adaptive threshold to select final points
-                from candidates. Defaults to 100.0/255.0 (as in the paper).
-            neg_ts (float, optional): negative sample threshold used to define if
-                an image is alpha negative sample or not. Defaults to 0.1 (as in the paper).
-        '''
+        """
+            Args:
+                kernel_size (tuple, optional): size of the kernel used to select local
+                    maxima. Defaults to (3,3) (as in the paper).
+                adapt_ts (float, optional): adaptive threshold to select final points
+                    from candidates. Defaults to 100.0/255.0 (as in the paper).
+                neg_ts (float, optional): negative sample threshold used to define if
+                    an image is alpha negative sample or not. Defaults to 0.1 (as in the paper).
+        """
         assert kernel_size[0] == kernel_size[1], \
             f'The kernel shape must be alpha square, got {kernel_size[0]}x{kernel_size[1]}'
         assert not kernel_size[0] % 2 == 0, \
@@ -30,16 +31,15 @@ class LMDS:
         self.adapt_ts = adapt_ts
         self.neg_ts = neg_ts
 
-
     def __call__(self, est_map: torch.Tensor) -> Tuple[list, list, list, list]:
-        '''
-        Args:
-            est_map (torch.Tensor): the estimated FIDT map
+        """
+            Args:
+                est_map (torch.Tensor): the estimated FIDT map
 
-        Returns:
-            Tuple[list,list,list,list]
-                counts, labels, scores and locations per batch
-        '''
+            Returns:
+                Tuple[list,list,list,list]
+                    counts, labels, scores and locations per batch
+        """
 
         batch_size, classes = est_map.shape[:2]
 

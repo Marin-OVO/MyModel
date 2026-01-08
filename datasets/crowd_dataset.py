@@ -1,4 +1,3 @@
-# this code is based on https://github.com/Alexandre-Delplanque/HerdNet/blob/main/animaloc/datasets/csv.py
 
 import numpy as np
 import torch
@@ -18,7 +17,6 @@ from datasets.transforms import *
 
 @DATASETS.register()
 class CrowdDataset(Dataset):
-
     def __init__(
             self,
             data_root: str,
@@ -29,16 +27,16 @@ class CrowdDataset(Dataset):
             end_transforms: Optional[list] = None
     ) -> None:
         """
-        :param data_root: path to the images folder
-        :param train_list: list of training images, each line represent a raw image path and its corresponding label path
-        :param val_list: list of validation images, each line represent a raw image path and its corresponding label path
-        :param albu_transforms: an albumentations' transformations
-                list that takes input sample as entry and returns a transformed
-                version. Defaults to None.
-        :param end_transforms: list of transformations that takes
-                tensor and expected target as input and returns a transformed
-                version. These will be applied after albu_transforms. Defaults
-                to None.
+            data_root: path to the images folder
+            train_list: list of training images, each line represent a raw image path and its corresponding label path
+            val_list: list of validation images, each line represent a raw image path and its corresponding label path
+            albu_transforms: an albumentations' transformations
+                            list that takes input sample as entry and returns a transformed
+                            version. Defaults to None.
+            end_transforms: list of transformations that takes
+                            tensor and expected target as input and returns a transformed
+                            version. These will be applied after albu_transforms. Defaults
+                            to None.
         """
         assert isinstance(albu_transforms, (list, type(None))), \
             f'albumentations-transformations must be a list, got {type(albu_transforms)}'
@@ -157,7 +155,6 @@ class CrowdDataset(Dataset):
 
     def __len__(self):
         return len(self._img_list)
-
 
 
 if __name__ == '__main__':

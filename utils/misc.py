@@ -1,8 +1,9 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 """
 Misc functions, including distributed helpers.
-
 Mostly copy-paste from torchvision references.
+
+P2PNet
 """
 import os
 import subprocess
@@ -28,10 +29,10 @@ if float(torchvision.__version__[:3]) < 0.7:
 
 
 class SmoothedValue(object):
-    """Track a series of values and provide access to smoothed values over a
-    window or the global series average.
     """
-
+        Track a series of values and provide access to smoothed values over a
+        window or the global series average.
+    """
     def __init__(self, window_size=20, fmt=None):
         if fmt is None:
             fmt = "{median:.4f} ({global_avg:.4f})"
@@ -47,7 +48,7 @@ class SmoothedValue(object):
 
     def synchronize_between_processes(self):
         """
-        Warning: does not synchronize the deque!
+            Warning: does not synchronize the deque!
         """
         if not is_dist_avail_and_initialized():
             return
@@ -91,11 +92,11 @@ class SmoothedValue(object):
 
 def all_gather(data):
     """
-    Run all_gather on arbitrary picklable data (not necessarily tensors)
-    Args:
-        data: any picklable object
-    Returns:
-        list[data]: list of data gathered from each rank
+        Run all_gather on arbitrary picklable data (not necessarily tensors)
+        Args:
+            data: any picklable object
+        Returns:
+            list[data]: list of data gathered from each rank
     """
     world_size = get_world_size()
     if world_size == 1:
@@ -134,12 +135,12 @@ def all_gather(data):
 
 def reduce_dict(input_dict, average=True):
     """
-    Args:
-        input_dict (dict): all the values will be reduced
-        average (bool): whether to do average or sum
-    Reduce the values in the dictionary from all processes so that all processes
-    have the averaged results. Returns a dict with the same fields as
-    input_dict, after reduction.
+        Args:
+            input_dict (dict): all the values will be reduced
+            average (bool): whether to do average or sum
+        Reduce the values in the dictionary from all processes so that all processes
+        have the averaged results. Returns a dict with the same fields as
+        input_dict, after reduction.
     """
     world_size = get_world_size()
     if world_size < 2:
@@ -423,7 +424,9 @@ def init_distributed_mode(args):
 
 @torch.no_grad()
 def accuracy(output, target, topk=(1,)):
-    """Computes the precision@k for the specified values of k"""
+    """
+        Computes the precision@k for the specified values of k
+    """
     if target.numel() == 0:
         return [torch.zeros([], device=output.device)]
     maxk = max(topk)
@@ -443,9 +446,9 @@ def accuracy(output, target, topk=(1,)):
 def interpolate(input, size=None, scale_factor=None, mode="nearest", align_corners=None):
     # type: (Tensor, Optional[List[int]], Optional[float], str, Optional[bool]) -> Tensor
     """
-    Equivalent to nn.functional.interpolate, but with support for empty batch sizes.
-    This will eventually be supported natively by PyTorch, and this
-    class can go away.
+        Equivalent to nn.functional.interpolate, but with support for empty batch sizes.
+        This will eventually be supported natively by PyTorch, and this
+        class can go away.
     """
     if float(torchvision.__version__[:3]) < 0.7:
         if input.numel() > 0:
@@ -461,7 +464,7 @@ def interpolate(input, size=None, scale_factor=None, mode="nearest", align_corne
 
 
 class FocalLoss(nn.Module):
-    r"""
+    """
         This criterion is a implemenation of Focal Loss, which is proposed in
         Focal Loss for Dense Object Detection.
 
