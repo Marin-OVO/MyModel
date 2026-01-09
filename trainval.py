@@ -15,6 +15,7 @@ import albumentations as A
 from datasets.transforms import Normalize, PointsToMask
 
 
+# trainval
 def args_parser():
 
     parser = argparse.ArgumentParser(description=__doc__)
@@ -25,6 +26,7 @@ def args_parser():
     parser.add_argument('--epoch', default=150, type=int, metavar='N')
     parser.add_argument('--batch_size', default=8, type=int, metavar='N')
     parser.add_argument('--lr', default=0.0003, type=float)
+    parser.add_argument('--num_worker', default=6, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--ptm_down_ratio', default=1, type=int)
 
@@ -62,6 +64,7 @@ def main(args):
     device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
     os.makedirs(args.output_dir, exist_ok=True)
 
+    # output with time
     timestr = time_str()
     work_dir = os.path.join(args.output_dir, f'run_{timestr}'.format(timestr))
     os.makedirs(work_dir, exist_ok=True)
@@ -84,20 +87,24 @@ def main(args):
     model.to(device)
     logger.info(f'Model created and moved to {device}')
 
+    # optimizer -> AdamW
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=args.lr,
         weight_decay=args.weight_decay
     )
+    # lr_scheduler -> cosine annealing
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer,
         T_max=args.epoch,
         eta_min=1e-6
     )
 
+    # 50% H/V flip + normalize + point -> mask + to_tensor
     train_albu_transforms = [A.HorizontalFlip(p=0.5), A.VerticalFlip(p=0.5)]
     train_end_transforms = [Normalize(), PointsToMask(radius=args.radius, num_classes=args.num_classes, squeeze=False, down_ratio=args.ptm_down_ratio)]
 
+    # normalize + point -> mask + to_tensor
     val_albu_transforms = []
     val_end_transforms = [Normalize(), PointsToMask(radius=args.radius, num_classes=args.num_classes, squeeze=False, down_ratio=args.ptm_down_ratio)]
 
@@ -122,21 +129,23 @@ def main(args):
 
     logger.info(f'Train dataset size: {len(train_dataset)}')
     logger.info(f'Val dataset size: {len(val_dataset)}')
-
     logger.info(f'Total parameters: {total_params / 1e6:.2f} M')
     logger.info(f'Trainable parameters: {trainable_params / 1e6:.2f} M')
 
+    # something wrong with  collate_fn?
     train_dataloader = DataLoader(
         dataset = train_dataset,
         batch_size = args.batch_size,
         shuffle = True,
-        pin_memory=True
+        pin_memory=True,
+        num_workers=args.num_worker
     )
     val_dataloader = DataLoader(
         dataset = val_dataset,
         batch_size = 1,
         shuffle = False,
-        pin_memory=True
+        pin_memory=True,
+        num_workers=args.num_worker
     )
 
     metrics = PointsMetrics(radius=2, num_classes=args.num_classes)
@@ -157,26 +166,33 @@ def main(args):
     elif select == 'max':
         best_val = 0
 
-    # Training loop
+    # training loop
     logger.info('Start Training:')
+
+    train_loss_list = []
+    lr_list = []
+    map_list = []
 
     for epoch in range(last_epoch, args.epoch):
         logger.info('=' * 60)
-        logger.info(f'Epoch {epoch + 1}/{args.epoch}')
+        logger.info('Epoch [{:^3}/{:<3}]'.format(epoch + 1, args.epoch))
         # logger.info('=' * 60)
 
-        # Train
-        loss = train_one_epoch(
+        # train
+        loss, lr = train_one_epoch(
             model=model,
             train_dataloader=train_dataloader,
             optimizer=optimizer,
-            epoch=epoch + 1,
+            epoch=epoch + 1, # epoch -> (1, ... , )
             device=device,
             logger=logger,
             print_freq=print_freq,
             args=args
         )
+        train_loss_list.append(loss)
+        lr_list.append(lr)
 
+        # val
         tmp_results = val_one_epoch(
             model=model,
             val_dataloader=val_dataloader,
@@ -184,13 +200,14 @@ def main(args):
             metrics=metrics,
             args=args
         )
+        map_list.append(tmp_results["mAP"])
 
         is_best = False
 
         if select == 'min':
             if tmp_results[validate_on] < best_val:
                 best_val = tmp_results[validate_on]
-                best_epoch = epoch + 1
+                best_epoch = epoch + 1 # not tmp epoch
                 is_best = True
 
         elif select == 'max':
@@ -225,25 +242,25 @@ def main(args):
             outpath = os.path.join(work_dir, 'latest_model.pth')
             torch.save(state, outpath)
 
-        # Add best info to results
+        # add the best info to results
         tmp_results['best_val'] = best_val
         tmp_results['best_epoch'] = best_epoch
         tmp_results['train_loss'] = loss
 
-        # Log to CSV
-        data_frame = pd.DataFrame(data=tmp_results, index=[epoch])
+        # log to csv
+        data_frame = pd.DataFrame([tmp_results])
         if epoch == 0:
-            data_frame.to_csv(csv_path, mode='w', header=True, index_label='epoch')
+            data_frame.to_csv(csv_path, mode='w', header=True, index=False)
         else:
-            data_frame.to_csv(csv_path, mode='a', header=False, index_label='epoch')
+            data_frame.to_csv(csv_path, mode='a', header=False, index=False)
 
-        # Log validation results
+        # log val results
         logger.info(
-            f"<<Test>>\n"
-            f"Epoch: {epoch + 1:3}.  "
-            f"{validate_on}: {tmp_results[validate_on]:6.3f}.  "
-            f"Best-Val: {best_val:6.3f}.  "
-            f"Best-Epoch: {best_epoch:3}"
+            f"Val Results: "
+            f"Epoch: {epoch + 1:^3}.  "
+            f"{validate_on}: {tmp_results[validate_on]:^8.4f}.  "
+            f"Best-Val: {best_val:^8.4f}.  "
+            f"Best-Epoch: {best_epoch:^3}" # from tmp results
         )
 
         lr_scheduler.step()
@@ -254,6 +271,13 @@ def main(args):
     logger.info(f'Results saved to: {work_dir}')
     logger.info('=' * 60)
 
+    if len(train_loss_list) != 0 and len(lr_list) != 0:
+        from utils.plot_curve import plot_loss_and_lr
+        plot_loss_and_lr(train_loss_list, lr_list, work_dir)
+
+    if len(map_list) != 0:
+        from utils.plot_curve import plot_map
+        plot_map(map_list, work_dir)
 
 if __name__ == "__main__":
     args = args_parser()

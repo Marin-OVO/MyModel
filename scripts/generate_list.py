@@ -26,5 +26,6 @@ def main():
     for train_img in image_files:
         list_file.write(f"{os.path.join(val_images, train_img)} {os.path.join(val_images.replace('img', 'txts'), train_img.replace('.png', '.txt'))}\n")
 
+
 if __name__ == '__main__':
     main()

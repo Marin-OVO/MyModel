@@ -6,7 +6,7 @@ from typing import Optional
 LOSSES = Registry('losses')
 
 
-# heatmap
+# heatmap (B, C, H, W)
 @LOSSES.register()
 class FocalLoss(torch.nn.Module):
 
@@ -35,11 +35,6 @@ class FocalLoss(torch.nn.Module):
         self.eps = eps
 
     def forward(self, output: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        """
-        :param output:
-        :param target:
-        :return: torch.Tensor
-        """
         B, C, _, _ = target.shape
 
         if self.weights is not None:
@@ -90,7 +85,8 @@ class FocalLoss(torch.nn.Module):
             return loss.sum()
 
 
-class FocalLoss2(nn.Module):
+# false
+class withFocalLoss(nn.Module):
     def __init__(self, alpha=0.25, gamma=2.0, reduction='mean'):
         super().__init__()
         self.alpha = alpha

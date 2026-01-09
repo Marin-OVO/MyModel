@@ -160,7 +160,7 @@ class DownSample:
         return img, target
 
 
-# 扩大点的范围
+# point -> GS mask
 @TRANSFORMS.register()
 class PointsToMask:
     "Convert points annotation to mask with a buffer option"
@@ -258,6 +258,7 @@ class PointsToMask:
         return onehot_mask
 
 
+# FIDT
 @TRANSFORMS.register()
 class FIDT:
     ''' Convert points annotations into Focal-Inverse-Distance-Transform map.

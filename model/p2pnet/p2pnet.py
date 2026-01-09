@@ -12,6 +12,7 @@ from .matcher import build_matcher_crowd
 import numpy as np
 import time
 
+
 # the network frmawork of the regression branch
 class RegressionModel(nn.Module):
     def __init__(self, num_features_in, num_anchor_points=4, feature_size=256):

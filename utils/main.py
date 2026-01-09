@@ -11,6 +11,8 @@ from .averager import *
 from .loss import *
 
 
+# train/val epoch: train -> FocalLoss
+#                  val   -> LMDS
 def train_one_epoch(
         model: torch.nn.Module,
         train_dataloader: torch.utils.data.DataLoader,
@@ -19,7 +21,7 @@ def train_one_epoch(
         device: torch.device,
         logger: logging.Logger,
         print_freq: int,
-        args
+        args,
         ) -> float:
 
     # metric indicators
@@ -37,20 +39,23 @@ def train_one_epoch(
 
     model.train()
 
+    lr = optimizer.param_groups[0]['lr']
+
     # FocalLoss
     criterion = FocalLoss(reduction="mean", normalize=True)
     for step, (images, targets) in enumerate(train_dataloader):
 
         images = images.to(device)
 
-        # 训练输出
+        # train results
         outputs = model(images)
 
         gt_mask = targets.to(device).long()
+
         # if gt_mask.dim() == 4:
         #     gt_mask = gt_mask.squeeze(1)
 
-        # L1 -> UNet模型二分类预测损失
+        # Loss1 -> UNet(pred loss)
         loss = criterion(outputs, gt_mask)
 
         first_order_loss.update(loss.item())
@@ -63,14 +68,15 @@ def train_one_epoch(
 
         if step in print_freq_lst:
             logger.info(
-                "[Epoch: {:3}/{}][Iter: {:5}].  "
-                "[First:{first_order_loss.val:.3f}({first_order_loss.avg:.3f})  "
-                "Second:{second_order_loss.val:.3f}({second_order_loss.avg:.3f})  "
-                "Loss:{losses.val:.3f}({losses.avg:.3f})]  ".format(
-                    epoch, args.epoch, step,
-                    first_order_loss=first_order_loss,
-                    second_order_loss=second_order_loss,
-                    losses=losses,
+                "Epoch [{:^3}/{:<3}] | Iter {:^5} | LR {:.6f} | "
+                "First {:.3f}({:.3f}) | "
+                "Second {:.3f}({:.3f}) | "
+                "Total {:.3f}({:.3f})".format(
+                    epoch, args.epoch,
+                    step, lr,
+                    first_order_loss.val, first_order_loss.avg,
+                    second_order_loss.val, second_order_loss.avg,
+                    losses.val, losses.avg,
                 )
             )
 
@@ -80,19 +86,20 @@ def train_one_epoch(
     batch_times.update(batch_end-batch_start)
 
     logger.info(
-        "[Epoch:{:3}/{}].  "
-        "[First:{first_order_loss.val:.3f}({first_order_loss.avg:.3f})  "
-        "Second:{second_order_loss.val:.3f}({second_order_loss.avg:.3f})  "
-        "Loss:{losses.val:.3f}({losses.avg:.3f})]  "
-        "Time:{batch_times.avg:.2f}  ".format(
+        "Val   [Epoch {:^3}/{:<3}] | "
+        "First {:.3f}({:.3f}) | "
+        "Second {:.3f}({:.3f}) | "
+        "Total {:.3f}({:.3f}) | "
+        "Time {:.2f}s".format(
             epoch, args.epoch,
-            first_order_loss=first_order_loss,
-            second_order_loss=second_order_loss,
-            losses=losses,
-            batch_times=batch_times
-        ))
+            first_order_loss.val, first_order_loss.avg,
+            second_order_loss.val, second_order_loss.avg,
+            losses.val, losses.avg,
+            batch_times.avg,
+        )
+    )
 
-    return out
+    return out, lr
 
 
 @torch.no_grad
@@ -113,7 +120,7 @@ def val_one_epoch(
     for step, (images, targets) in enumerate(val_dataloader):
         images = images.cuda()
 
-        # 验证输出
+        # val results
         output = model(images)
 
         points = targets['points']
@@ -130,6 +137,7 @@ def val_one_epoch(
             labels = labels.squeeze(0).tolist()
 
         points = np.asarray(points)
+
         # (N, 2, 1) -> (N, 2)
         if points.ndim == 3 and points.shape[-1] == 1:
             points = points.squeeze(-1)
@@ -191,4 +199,4 @@ def val_one_epoch(
         "mAP": mAP
     }
 
-    return tmp_results
+    return tmp_results # a dict?

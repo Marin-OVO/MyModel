@@ -17,6 +17,7 @@ from datasets.register import DATASETS
 from datasets.transforms import *
 
 
+# img/ann -> transform/to_tensor(Must have: __getitem__/__len__)
 @DATASETS.register()
 class CrowdDataset(Dataset):
     def __init__(
@@ -155,9 +156,10 @@ class CrowdDataset(Dataset):
 
         tr_img, tr_target = self._transforms(img, target)
 
-        return tr_img, tr_target
+        return tr_img, tr_target # train/val -> torch.Tensor
 
     def __len__(self):
+
         return len(self._img_list)
 
 
