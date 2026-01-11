@@ -1,3 +1,6 @@
+"""
+    vis a single image
+"""
 import os
 import argparse
 
@@ -6,7 +9,9 @@ import numpy as np
 from PIL import Image
 
 import torch
-import torchvision.transforms as T
+import torchvision
+
+import albumentations as A
 
 from model import UNet
 from utils.lmds import LMDS
@@ -14,7 +19,8 @@ from model.utils import load_model
 
 
 def args_parser():
-    parser = argparse.ArgumentParser()
+
+    parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument('--num_classes', default=2, type=int)
     parser.add_argument('--bilinear', default=True, type=bool)
@@ -23,48 +29,51 @@ def args_parser():
     parser.add_argument('--device', default='cuda', type=str)
 
     # path
-    parser.add_argument("--img_path", default="data/enhanced_crowdsat/val/img/1.png", type=str)
+    parser.add_argument("--img_path", default="red_square.png", type=str)
     parser.add_argument("--output_path", default="vis", type=str)
-    parser.add_argument("--checkpoint_path", default="weights/best_model.pth", type=str)
+    parser.add_argument("--checkpoint_path", default="weights/all_sigmoid/best_model.pth", type=str)
 
-    # LMDS
+    # lmds
     parser.add_argument('--lmds_kernel_size', default=3, type=int)
-    parser.add_argument('--lmds_adapt_ts', default=0.5, type=float)
+    parser.add_argument('--lmds_adapt_ts', default=0.1, type=float)
 
     return parser.parse_args()
 
 
 def vis(args):
+
     device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
     os.makedirs(args.output_path, exist_ok=True)
 
-    img_pil = Image.open(args.img_path).convert('RGB')
-    img_np = np.array(img_pil)
-
-    transform = T.Compose([
-        T.ToTensor(),
-        T.Normalize(mean=(0.485, 0.456, 0.406),
-                    std=(0.229, 0.224, 0.225))
+    image = Image.open(args.img_path).convert('RGB') # PIL numpy.ndarray (H, W, 3)
+    transform = A.Compose([
+        A.Normalize(
+            mean=(0.485, 0.456, 0.406),
+            std=(0.229, 0.224, 0.225))
     ])
+    image_np_ = np.array(image)
+    image_np = transform(image=image_np_)['image'] # (H, W, 3)
+    image = torchvision.transforms.ToTensor()(image) # tensor (3, H, W)
+    image = image.unsqueeze(0).to(device) # tensor (1, 3, H, W)
 
-    img_tensor = transform(img_pil).unsqueeze(0).to(device)
-
-    model = UNet(num_ch=3, num_class=args.num_classes, bilinear=args.bilinear).to(device)
-
+    # model
+    model = UNet(num_ch=3, num_class=args.num_classes, bilinear=args.bilinear)
+    model.to(device)
     model = load_model(model, args.checkpoint_path, strict=False)
     model.eval()
 
     with torch.no_grad():
-        pred = model(img_tensor)
+        outputs = model(image) # [B, 2, H, W]
+        # outputs = torch.sigmoid(outputs)
 
     lmds = LMDS(
         kernel_size=(args.lmds_kernel_size, args.lmds_kernel_size),
         adapt_ts=args.lmds_adapt_ts
     )
 
-    counts, locs, labels, scores = lmds(pred)
+    counts, locs, labels, scores = lmds(outputs)
 
-    draw_img = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+    draw_img = cv2.cvtColor(image_np_, cv2.COLOR_RGB2BGR)
 
     for p in locs[0]:
         y, x = int(p[0]), int(p[1])
@@ -75,8 +84,6 @@ def vis(args):
         os.path.basename(args.img_path)
     )
     cv2.imwrite(save_path, draw_img)
-
-    print(f"[INFO] Count: {counts[0]}")
     print(f"[INFO] Saved to: {save_path}")
 
 

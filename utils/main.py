@@ -53,7 +53,7 @@ def train_one_epoch(
 
         # train results
         outputs = model(images)             # (B, 2, H, W) logits
-        outputs = torch.sigmoid(outputs)    # Must heatmap -> FocalLoss()(Now UNet -> logits)
+        # outputs = torch.sigmoid(outputs)    # Must heatmap -> FocalLoss()(Now UNet -> logits)
 
         gt_mask = targets.to(device).long() # (B, 2, H, W)
 
@@ -132,7 +132,7 @@ def val_one_epoch(
 
         # val results
         outputs = model(images)
-        outputs = torch.sigmoid(outputs)
+        # outputs = torch.sigmoid(outputs) #
 
         points = targets['points']
         labels = targets['labels']

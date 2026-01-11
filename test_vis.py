@@ -1,4 +1,8 @@
+"""
+    batch vis images
+"""
 import os
+import csv
 import argparse
 
 import cv2
@@ -23,7 +27,7 @@ def args_parser():
     parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument('--data_root', default='data/crowdsat', type=str)
-    parser.add_argument('--checkpoint_path', default='weights/best_model.pth', type=str)
+    parser.add_argument('--checkpoint_path', default='weights/all_sigmoid/best_model.pth', type=str)
     parser.add_argument('--output_path', default='vis', type=str)
 
     parser.add_argument('--num_classes', default=2, type=int)
@@ -35,7 +39,7 @@ def args_parser():
     parser.add_argument('--ds_crowd_type', default='point', type=str)
 
     parser.add_argument('--lmds_kernel_size', default=3, type=int)
-    parser.add_argument('--lmds_adapt_ts', default=0.5, type=float)
+    parser.add_argument('--lmds_adapt_ts', default=0.1, type=float)
 
     return parser.parse_args()
 
@@ -48,7 +52,7 @@ def vis(args):
     work_dir = os.path.join(args.output_path, f'vis_{timestr}')
     os.makedirs(work_dir, exist_ok=True)
 
-    vis_dir = os.path.join(work_dir, 'vis_pred')
+    vis_dir = os.path.join(work_dir, 'vis')
     tf_dir = os.path.join(work_dir, 'vis_tf')
     os.makedirs(vis_dir, exist_ok=True)
     os.makedirs(tf_dir, exist_ok=True)
@@ -138,6 +142,8 @@ def vis(args):
             )
 
             output = model(image)
+            # outputs = torch.sigmoid(outputs)
+
             _, locs, _, _ = lmds(output)
 
             down_ratio = args.ds_down_ratio
@@ -175,6 +181,24 @@ def vis(args):
                 img_tf
             )
             print(f"[{idx + 1:3d}/{len(test_dataset)}] saved {img_path}")
+
+    # save to csv
+    csv_path = os.path.join(work_dir, 'test_metrics.csv')
+
+    metrics.aggregate()
+
+    recall = metrics.recall()
+    precision = metrics.precision()
+    f1_score = metrics.fbeta_score()
+
+    with open(csv_path, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Metric', 'Value'])
+        writer.writerow(['Precision', precision])
+        writer.writerow(['Recall', recall])
+        writer.writerow(['F1-score', f1_score])
+
+    print(f"[INFO] test metrics saved to {csv_path}")
 
 
 if __name__ == '__main__':
