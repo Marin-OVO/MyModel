@@ -33,6 +33,7 @@ output/
 outputs/
 runs/
 tb_logs/
+repo_root/
 
 # experiment results
 results/

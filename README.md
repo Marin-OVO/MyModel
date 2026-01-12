@@ -21,3 +21,9 @@
 - **FIDT** and **PointToMask** accept inputs in either `PIL.Image` or `torch.Tensor` format.  
   - **FIDT** expects input with shape `(C, H, W)`.  
   - **PointToMask** supports inputs of shape `(H, W)` or `(C, H, W)`.
+<p align="center">
+  <img src="repo_root/fidt.png" width="700">
+</p>
+<p align="center">
+  <img src="repo_root/ptm.png" width="700">
+</p>
