@@ -120,8 +120,8 @@ def main(args):
     train_end_transforms = [
         PointsToMask(radius=args.radius,
                      num_classes=args.num_classes,
-                     squeeze=False, down_ratio=args.ptm_down_ratio)
-    ]
+                     squeeze=False, down_ratio=args.ptm_down_ratio),
+    ] # paper: FIDT -> PointToMask
 
     # normalize + point -> mask + to_tensor
     val_albu_transforms = [

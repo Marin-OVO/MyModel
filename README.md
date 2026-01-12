@@ -18,3 +18,6 @@
 - Configuration management should be handled via `configs.yaml` to ensure reproducibility and clarity.
 - The **LMDS** module outputs **point count, coordinates, labels, and confidence scores**, all in **list format**.
 - **PointToMask** generates the ground-truth **hard disk mask** from point-level annotations.
+- **FIDT** and **PointToMask** accept inputs in either `PIL.Image` or `torch.Tensor` format.  
+  - **FIDT** expects input with shape `(C, H, W)`.  
+  - **PointToMask** supports inputs of shape `(H, W)` or `(C, H, W)`.
